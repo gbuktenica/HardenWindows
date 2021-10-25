@@ -14,20 +14,31 @@
 #>
 [CmdletBinding()]
 param (
-    $Options
+    [switch]$Rollback
 )
 function Disable-Cryptography {
+    param (
+        [switch]$Rollback
+    )
     $sChannel = "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL"
-
+    if ($Rollback ){
+        $Enabled = "1"
+        $DisabledByDefault = "1"
+        $Action = "Enabling"
+    } else {
+        $Enabled = "0"
+        $DisabledByDefault = "1"
+        $Action = "Disabling"
+    }
     $Hashes = "Hashes\MD5"
     foreach ($Hash in $Hashes) {
         if (-not (Test-Path "$sChannel\$Hash" -ErrorAction SilentlyContinue)) {
             Write-Host "Creating key: $sChannel\$Hash"
             New-Item -Path "$sChannel\$Hash" -ErrorAction Stop | Out-Null
         }
-        if ((Get-ItemProperty -Path "$sChannel\$Hash" -ErrorAction SilentlyContinue).Enabled -ne "0") {
-            Write-Host "Disabling Hash: $Hash"
-            New-ItemProperty -Path "$sChannel\$Hash" -Name Enabled -Value 0x00000000 -Force -PropertyType DWord | Out-Null
+        if ((Get-ItemProperty -Path "$sChannel\$Hash" -ErrorAction SilentlyContinue).Enabled -ne $Enabled) {
+            Write-Host "$Action Hash: $Hash"
+            New-ItemProperty -Path "$sChannel\$Hash" -Name Enabled -Value $Enabled -Force -PropertyType DWord | Out-Null
         }
     }
 
@@ -51,8 +62,8 @@ function Disable-Cryptography {
         }
         $EscapedCipher = $Cipher.Replace("/","\\/")
         if ((Get-ItemProperty -Path "$sChannel\Ciphers\$EscapedCipher" -ErrorAction SilentlyContinue).Enabled -ne "0") {
-            Write-Host "Disabling Cipher: $Cipher"
-            New-ItemProperty -Path "$sChannel\Ciphers\$EscapedCipher" -Name Enabled -Value 0x00000000 -Force -PropertyType DWord | Out-Null
+            Write-Host "$Action Cipher: $Cipher"
+            New-ItemProperty -Path "$sChannel\Ciphers\$EscapedCipher" -Name Enabled -Value $Enabled -Force -PropertyType DWord | Out-Null
         }
     }
     $Key.Close()
@@ -75,10 +86,10 @@ function Disable-Cryptography {
             Write-Host "Creating key: $sChannel\Protocols\$Protocol\Server"
             New-Item -Path "$sChannel\Protocols\$Protocol\Server" -ErrorAction Stop | Out-Null
         }
-        if ((Get-ItemProperty -Path "$sChannel\Protocols\$Protocol\Server" -ErrorAction SilentlyContinue).Enabled -ne "0" -and $Protocol -ne "TLS 1.2") {
-            Write-Host "Disabling Protocol: $Protocol"
-            New-ItemProperty -Path "$sChannel\Protocols\$Protocol\Server" -Name Enabled -Value 0x00000000 -Force -PropertyType DWord | Out-Null
-            New-ItemProperty -Path "$sChannel\Protocols\$Protocol\Server" -Name DisabledByDefault -Value 0x00000001 -Force -PropertyType DWord | Out-Null
+        if ((Get-ItemProperty -Path "$sChannel\Protocols\$Protocol\Server" -ErrorAction SilentlyContinue).Enabled -ne $Enabled -and $Protocol -ne "TLS 1.2") {
+            Write-Host "$Action Protocol: $Protocol"
+            New-ItemProperty -Path "$sChannel\Protocols\$Protocol\Server" -Name Enabled -Value $Enabled -Force -PropertyType DWord | Out-Null
+            New-ItemProperty -Path "$sChannel\Protocols\$Protocol\Server" -Name DisabledByDefault -Value $DisabledByDefault -Force -PropertyType DWord | Out-Null
         }
     }
     if ((Get-ItemProperty -Path "$sChannel\Protocols\TLS 1.2\Server" -ErrorAction SilentlyContinue).Enabled -ne "1" ) {
@@ -89,6 +100,9 @@ function Disable-Cryptography {
 }
 
 function Disable-Services {
+    param (
+        [switch]$Rollback
+    )
     $Services = @()
     $Services += "Application Layer Gateway Service"
     $Services += "Auto Time Zone Updater"
@@ -114,7 +128,6 @@ function Disable-Services {
     $Services += "Sensor Service"
     $Services += "Smartcard"
     $Services += "Sysmain"
-    $Services += "TCP/IP NetBIOS Helper"
     $Services += "WalletService"
     $Services += "Windows Biometric Service"
     $Services += "Windows Camera Frame Server"
@@ -125,18 +138,28 @@ function Disable-Services {
     $Services += "Windows Mobile Hotspot Service"
     $Services += "Windows Search"
 
-    foreach ($Service in $Services) {
-        $ServiceObject = Get-Service -DisplayName $Service -ErrorAction SilentlyContinue | Select-Object Name, StartType, Status
-        if ($ServiceObject.Status -eq "Running") {
-            Write-Output "Stopping Service: $Service"
-            Stop-Service -DisplayName $Service
+    if ($Rollback) {
+        foreach ($Service in $Services) {
+            $ServiceObject = Get-Service -DisplayName $Service -ErrorAction SilentlyContinue | Select-Object Name, StartType, Status
+            if ($ServiceObject.StartType -eq "Disabled" -and ($ServiceObject.Name).length -gt 0) {
+                Write-Output "Enabling Service: $Service"
+                Set-Service -Name $ServiceObject.Name -StartupType Manual
+            }
         }
-        if ($ServiceObject.StartType -ne "Disabled" -and ($ServiceObject.Name).length -gt 0) {
-            Write-Output "Disabling Service: $Service"
-            Set-Service -Name $ServiceObject.Name -StartupType Disabled
+    } else {
+        foreach ($Service in $Services) {
+            $ServiceObject = Get-Service -DisplayName $Service -ErrorAction SilentlyContinue | Select-Object Name, StartType, Status
+            if ($ServiceObject.Status -eq "Running") {
+                Write-Output "Stopping Service: $Service"
+                Stop-Service -DisplayName $Service
+            }
+            if ($ServiceObject.StartType -ne "Disabled" -and ($ServiceObject.Name).length -gt 0) {
+                Write-Output "Disabling Service: $Service"
+                Set-Service -Name $ServiceObject.Name -StartupType Disabled
+            }
         }
     }
 }
 
-Disable-Cryptography
-Disable-Services
+Disable-Cryptography -Rollback:$Rollback
+Disable-Services -Rollback:$Rollback
