@@ -1,6 +1,6 @@
 <#
-.SYNOPSIS
-    Windows Server hardening script
+    .SYNOPSIS
+        Windows Server hardening script
 
     .DESCRIPTION
     This script will harden Windows Server 2008 R2 and above. It is based on a small subset of the CIS standards.
@@ -17,12 +17,12 @@
     This will reverse the hardening changes to the default values in case of issues arising from hardening.
     Note that this will not guarantee that the server will be in the same state as prior to hardening, it is setting default values only.
 
-.NOTES
-    Author          : Glen Buktenica
-    License         : MIT
-    Initial Release : 2017 05 24
-    Version         : 2021 11 04
-    Repository      : https://github.com/gbuktenica/HardenWindows
+    .NOTES
+        Author          : Glen Buktenica
+        License         : MIT
+        Initial Release : 2017 05 24
+        Version         : 2021 11 04
+        Repository      : https://github.com/gbuktenica/HardenWindows
 #>
 [CmdletBinding()]
 param (
@@ -33,7 +33,7 @@ function Disable-Cryptography {
         [switch]$Rollback
     )
     $sChannel = "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL"
-    if ($Rollback ){
+    if ($Rollback ) {
         $Enabled = "1"
         $DisabledByDefault = "1"
         $Action = "Enabling"
@@ -72,7 +72,7 @@ function Disable-Cryptography {
             Write-Host "Creating key: $sChannel\Ciphers\$Cipher"
             $Key.CreateSubKey($Cipher)
         }
-        $EscapedCipher = $Cipher.Replace("/","\\/")
+        $EscapedCipher = $Cipher.Replace("/", "\\/")
         if ((Get-ItemProperty -Path "$sChannel\Ciphers\$EscapedCipher" -ErrorAction SilentlyContinue).Enabled -ne "0") {
             Write-Host "$Action Cipher: $Cipher"
             New-ItemProperty -Path "$sChannel\Ciphers\$EscapedCipher" -Name Enabled -Value $Enabled -Force -PropertyType DWord | Out-Null
