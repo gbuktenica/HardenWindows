@@ -56,6 +56,7 @@ function Disable-Cryptography {
 
     $Ciphers = @()
     $Ciphers += "DES 56/56"
+    $Ciphers += "Triple DES 168"
     $Ciphers += "NULL"
     $Ciphers += "RC2 128/128"
     $Ciphers += "RC2 40/128"
