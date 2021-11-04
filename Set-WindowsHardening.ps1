@@ -1,15 +1,27 @@
 <#
 .SYNOPSIS
     Windows Server hardening script
-.DESCRIPTION
-    Harden server to CIS standards by making the following changes:
+
+    .DESCRIPTION
+    This script will harden Windows Server 2008 R2 and above. It is based on a small subset of the CIS standards.
+    The following changes are made:
     * Disable insecure encryption protocols
-    * Disable unused services
+    * Disable frequently unused services
+
+    .EXAMPLE
+    .\Set-WIndowsHardening.ps1
+    This will apply the changes to the local server or workstation.
+
+    .EXAMPLE
+    .\Set-WindowsHardening.ps1 -Rollback
+    This will reverse the hardening changes to the default values in case of issues arising from hardening.
+    Note that this will not guarantee that the server will be in the same state as prior to hardening, it is setting default values only.
+
 .NOTES
     Author          : Glen Buktenica
     License         : MIT
-    Initial Release : 20170524
-    Version         : 20211022
+    Initial Release : 2017 05 24
+    Version         : 2021 11 04
     Repository      : https://github.com/gbuktenica/HardenWindows
 #>
 [CmdletBinding()]
@@ -160,6 +172,7 @@ function Disable-Services {
         }
     }
 }
-
+Write-Output "Disabling Cryptography"
 Disable-Cryptography -Rollback:$Rollback
+Write-Output "Disabling Services"
 Disable-Services -Rollback:$Rollback
